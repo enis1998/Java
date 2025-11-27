@@ -1,7 +1,7 @@
 
-# ✅ 2) SPRING BOOT MÜLAKAT SORULARI (BANKALARDA EN ÇOK SORULAN BÖLÜM)
+# ✅ 2) SPRING BOOT MÜLAKAT SORULARI
 
-Bu doküman, Spring Boot mülakatlarında (özellikle bankalarda) en sık sorulan konuları, sadece tanım vererek değil, işin mantığını ve örnek kodları anlatarak özetler.
+Bu doküman, Spring Boot mülakatlarında en sık sorulan konuları, sadece tanım vererek değil, işin mantığını ve örnek kodları anlatarak özetler.
 
 ---
 
