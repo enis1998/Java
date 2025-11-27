@@ -291,47 +291,179 @@ class Dog extends Animal {
 
 ---
 
-### 1.9. static nedir, neler statik olabilir?
+## static nedir neler statik olabilir? (method, variable, inner class)?
 
-`static` = üye sınıfa ait, instance’a değil.
+`static`, bir üyenin **sınıfa ait** olduğunu söyler; yani o üye nesneye (instance’a) değil, doğrudan sınıfa bağlıdır.
+Normalde: her `new` dediğinde ayrı bir nesne ve o nesneye ait alanlar oluşur.
+`static` ise "bu alan/metot tüm nesneler için ortak" demektir.
 
-Static olabilenler:
-- Static field (değişken)
-- Static method
-- Static nested class
-- Static block
+### 1.9.1. Statik olabilenler
+
+1. **Static field (sınıf değişkeni)**
+- Tüm instance’lar tarafından **paylaşılan tek bir kopya** vardır.
+- Örnek: sayaç, global config, cache benzeri ortak bilgiler.
 
 ```java
 public class Counter {
-    public static int count = 0;
+    public static int count = 0; // tüm nesneler için ortak
 
-    public static void increment() {
+    public Counter() {
         count++;
     }
+}
+
+Counter c1 = new Counter();
+Counter c2 = new Counter();
+System.out.println(Counter.count); // 2
+```
+
+2. **Static method**
+- Sınıf üzerinden çağrılır: `Math.max(…)`, `Collections.sort(…)` gibi.
+- `this` kullanamaz, çünkü herhangi bir instance’a bağlı değildir.
+- Sadece static üyeleri **doğrudan** kullanabilir.
+
+```java
+public class MathUtil {
+    public static int square(int x) {
+        return x * x;
+    }
+}
+
+int result = MathUtil.square(5);
+```
+
+3. **Static nested class**
+- Bir sınıfın içinde ama dış sınıfın instance’ına bağlı olmayan iç sınıftır.
+- `Outer.Inner` gibi kullanılır, `new Outer()` oluşturmadan da yaratılabilir.
+
+```java
+public class Outer {
+    static class Inner {
+        void hello() {
+            System.out.println("Static nested class");
+        }
+    }
+}
+
+Outer.Inner inner = new Outer.Inner();
+inner.hello();
+```
+
+> Fark: `static class Inner` → outer’ın `this`’ine erişemez. 
+> Static olmayan inner class ise outer instance’ına bağlıdır ve `Outer.this`’e erişebilir.
+
+4. **Static block**
+- Sınıf **ilk kez yüklenirken** bir defa çalışır.
+- Genelde static alanların karmaşık ilk değer atamalarında veya config yüklemede kullanılır.
+
+```java
+public class Config {
+    public static final Map<String, String> SETTINGS = new HashMap<>();
 
     static {
-        // sınıf yüklenirken bir defa çalışır
-        System.out.println("Class loaded");
+        SETTINGS.put("env", "prod");
+        SETTINGS.put("version", "1.0.0");
+        System.out.println("Config sınıfı yüklenirken bu blok 1 kez çalışır");
     }
 }
 ```
 
+### 1.9.2. Static ile ilgili önemli noktalar
+
+- **Static metod, non-static alana doğrudan erişemez** (çünkü `this` yok):
+
+```java
+public class Example {
+    private int instanceValue = 10;
+    private static int staticValue = 20;
+
+    public static void foo() {
+        // instanceValue; // HATA: instance alanına doğrudan erişemez
+        System.out.println(staticValue); // OK
+    }
+}
+```
+
+- Static alanlar global state gibi davranır:
+  - Fazla mutable static alan **testleri zorlaştırır** ve
+  - Concurrency (thread-safety) problemlerine yol açabilir.
+- Bu yüzden çoğunlukla:
+  - `static final` sabitler,
+  - Dikkatli tasarlanmış, thread-safe cache/config yapıları için kullanılır.
+
+- Bellek tarafı kabaca şöyle düşünülebilir:
+  - Static alanlar sınıf yüklenmesine bağlıdır, sınıf başına tek kopya olur.
+  - `new` ile her instance oluşturulduğunda bu static alanlar yeniden oluşmaz, sadece referans verilir.
+
+```
+
 ---
 
-### 1.10. Java memory modeli (Stack, Heap, Metaspace)
+## Java memory modeli (Stack, Heap, Metaspace)?
 
-**Stack**
-- Her thread’in kendi stack’i var.
-- Metot çağrıları, yerel değişkenler, referansların kendisi.
+Burada genelde iki şey karışıyor:
+- Fiziksel bellek alanları (Stack, Heap, Metaspace, native memory…),
+- **Java Memory Model (JMM)** denen, thread’ler arası görünürlük kuralları.
 
-**Heap**
-- Tüm nesneler/array’ler burada.
-- Tüm thread’ler ortak kullanır.
-- GC burada çalışır.
+Mülakatta çoğunlukla ilkini (Stack/Heap/Metaspace) anlatmak yeterli olur; ama JMM’den de kısaca bahsetmek artı yazar.
 
-**Metaspace**
-- Class metadata’ları (tanımlar, method imzaları).
-- Java 8+’ta `PermGen` yerine geldi.
+### 1.10.1. Stack
+
+- Her **thread’in kendine ait** bir stack’i vardır.
+- Şunlar stack’te tutulur:
+  - Metot çağrı bilgileri (call frame),
+  - Yerel primitive değişkenler (`int i`, `double x`),
+  - Nesne referanslarının **kendisi** (pointer gibi).
+- LIFO (Last In First Out) çalışır: metoda girince frame eklenir, çıkınca kaldırılır.
+
+```java
+public int add(int a, int b) {
+    int sum = a + b; // a, b, sum -> stack’te
+    return sum;
+}
+```
+
+- Eğer `Person p = new Person();` dersen:
+  - `p` referansı stack’te tutulur,
+  - `new Person()` ile oluşturulan gerçek nesne heap’te durur.
+
+### 1.10.2. Heap
+
+- Tüm `new` ile oluşturulan nesneler ve array’ler heap’te tutulur.
+- Heap **tüm thread’ler tarafından ortak kullanılır**.
+- Garbage Collector (GC) heap üzerinde çalışır ve artık erişilmeyen nesneleri temizler.
+
+Genelde generational yapıya sahiptir:
+- **Young Generation** (Eden + Survivor)
+  - Yeni nesneler önce buraya düşer.
+  - Çoğu nesne çok kısa yaşadığı için burada sık ve hızlı GC yapılır.
+- **Old Generation**
+  - Uzun yaşayan nesneler young’tan buraya taşınır (promotion).
+  - Burada daha seyrek ama daha ağır GC çalışır.
+
+### 1.10.3. Metaspace
+
+- Class metadata’ları (sınıf tanımları, method imzaları, bazı static bilgiler) burada tutulur.
+- Java 8 öncesinde `PermGen` vardı, Java 8+ ile `Metaspace` geldi.
+- Metaspace, **native memory** tarafını kullanır; yani boyutu JVM argümanlarıyla sınırlandırılabilir.
+
+### 1.10.4. Native memory ve diğer bölgeler (kısaca)
+
+- JVM’in kendisinin ve JIT compiler’ın kullandığı alanlar,
+- NIO `DirectByteBuffer` gibi heap dışı (off-heap) buffer’lar,
+- Her thread’in stack’leri vs. yine process’in toplam RAM kullanımına dahildir ama heap’ten ayrıdır.
+
+### 1.10.5. Java Memory Model (JMM)’e kısa değiniş
+
+“Java memory modeli” dendiğinde bazen şunu da kastederler:
+- Bir thread’in yaptığı yazma işlemleri diğer thread’ler tarafından **ne zaman görülebilir?**
+- `volatile`, `synchronized`, `final` alanlar bu görünürlük kurallarını nasıl etkiler?
+
+Özet:
+- JMM, compiler ve CPU’nun yaptığı optimizasyonlara rağmen,
+- Programcının belli kurallara uyduğunda (ör. `happens-before` ilişkisi) kodun **tahmin edilebilir** davranmasını garanti eder.
+- Concurrency konularında (`volatile`, `Atomic*`, lock-free yapılar) bu model çok önemlidir.
+
 
 ---
 
@@ -403,7 +535,68 @@ public static void main(String[] args) {
 
 ## 2) Threading & Concurrency
 
+### 2.3. Process vs Thread
+
+**Process**
+- Çalışan programın ayrı bir örneği.
+- Kendi adres alanı, heap, stack.
+- Diğer process’lerle bellek paylaşmaz (IPC gerek).
+
+**Thread**
+- Aynı process içindeki yürütme akışı.
+- Heap ve global veriyi diğer thread’lerle paylaşır.
+- Her thread’in kendi stack’i vardır.
+
+Backend’te:
+- Genelde: 1 JVM process + içinde birden fazla thread (request thread’leri, async thread’ler).
+
+Bunu biraz daha detaylı düşünelim:
+
+#### 2.3.1. Process (İşlem)
+
+- Her process’in:
+  - Kendi **virtual address space**’i,
+  - Kendi heap’i ve global verileri,
+  - Kendi dosya tanıtıcıları vardır.
+- Process’ler arasında veri paylaşımı için:
+  - Socket, pipe, dosya, HTTP, message queue vb. kullanılır (IPC).
+- Process oluşturmak ve context switch yapmak, thread’e göre daha maliyetlidir.
+
+#### 2.3.2. Thread (İş parçacığı)
+
+- Bir process’in içindeki yürütme akışıdır.
+- Aynı process’teki thread’ler:
+  - Aynı heap’i paylaşır,
+  - Sadece kendi stack’leri ayrıdır.
+- Daha hafiftir, fakat:
+  - Paylaşılan veri yüzünden race condition, deadlock vb. concurrency sorunları ortaya çıkar,
+  - `synchronized`, lock, `volatile`, `java.util.concurrent` yapıları gerekir.
+
+#### 2.3.3. Özet tablo
+
+| Özellik             | Process                                       | Thread                                         |
+|---------------------|-----------------------------------------------|------------------------------------------------|
+| Adres alanı         | Her process için ayrı                         | Aynı process içinde ortak                      |
+| Heap                | Her process’in kendi heap’i                   | Tüm thread’ler aynı heap’i paylaşır            |
+| Stack               | Process içinde birden çok stack olabilir      | Her thread’in kendi stack’i vardır             |
+| İzolasyon           | Yüksek (bellek paylaşımı yok)                 | Düşük (heap ortak, dikkatli senkronizasyon gerek) |
+| Oluşturma maliyeti  | Görece pahalı                                 | Daha ucuz                                      |
+| İletişim            | IPC (socket, pipe, dosya, HTTP, MQ vb.)      | Paylaşılan bellek + senkronizasyon              |
+| Çökme etkisi        | Bir process çökerse içindeki tüm thread’ler gider | Bir thread çökerse process genelde yaşamaya devam eder |
+
+#### 2.3.4. Spring Boot / backend açısından
+
+- Process seviyesi:
+  - Her microservice genelde ayrı bir JVM process (ayrı container/pod).
+- Thread seviyesi:
+  - Her HTTP isteği web server thread pool’undan bir thread kullanır.
+  - `@Async`, `@Scheduled`, MQ consumer gibi işler ayrı thread havuzlarından çalışır.
+
+---
+
 ### 2.1. Thread oluşturma yolları?
+
+Önce klasik kısa örneği görelim, sonra daha detaylı açıklamaya geçelim.
 
 ```java
 // 1) Thread extend ederek
@@ -445,6 +638,99 @@ executor.submit(() -> {
 executor.shutdown();
 ```
 
+Şimdi bunları biraz daha sistematik anlatalım:
+
+#### 2.1.1. Thread sınıfını extend etmek
+
+```java
+class MyThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Thread çalışıyor: " + Thread.currentThread().getName());
+    }
+}
+
+MyThread t = new MyThread();
+t.start(); // run() asenkron çalışır
+```
+
+- Artı: Basit, demo için anlaşılır.
+- Eksi: Java tek kalıtım destekler; `Thread`’i extend edersen başka sınıftan extend edemezsin.
+
+#### 2.1.2. Runnable arayüzünü implement etmek
+
+```java
+class MyTask implements Runnable {
+    @Override
+    public void run() {
+        System.out.println("Runnable çalışıyor: " + Thread.currentThread().getName());
+    }
+}
+
+Thread t = new Thread(new MyTask());
+t.start();
+```
+
+Lambda ile kullanımı:
+
+```java
+Runnable task = () -> {
+    System.out.println("Lambda ile runnable");
+};
+
+Thread t2 = new Thread(task);
+t2.start();
+```
+
+- `Runnable`:
+  - `void run()` metodu vardır,
+  - Sonuç döndürmez, checked exception fırlatamaz.
+
+#### 2.1.3. Callable + Future + ExecutorService
+
+Sonuç döndüren işler için `Callable` daha uygundur:
+
+```java
+ExecutorService executor = Executors.newSingleThreadExecutor();
+
+Callable<Integer> task = () -> {
+    Thread.sleep(1000);
+    return 42;
+};
+
+Future<Integer> future = executor.submit(task);
+
+// başka işler...
+
+Integer result = future.get(); // sonuç hazır değilse burada bekler
+System.out.println("Sonuç: " + result);
+
+executor.shutdown();
+```
+
+- `Callable<V>` → `V call() throws Exception;`
+- `Future<V>` → asenkron işin sonucunu ve durumunu temsil eder.
+
+#### 2.1.4. ExecutorService ile thread pool kullanmak
+
+Manuel `new Thread(...)` yerine çoğu gerçek projede thread pool kullanılır:
+
+```java
+ExecutorService executor = Executors.newFixedThreadPool(4);
+
+for (int i = 0; i < 10; i++) {
+    int jobId = i;
+    executor.submit(() -> {
+        System.out.println("İş " + jobId + " - " + Thread.currentThread().getName());
+    });
+}
+
+executor.shutdown();
+```
+
+- Thread’ler tekrar tekrar kullanılır → thread oluşturma/yıkma maliyeti azalır.
+- Aynı anda en fazla kaç thread çalışacağını kontrol edebilirsin.
+
 ---
 
 ### 2.2. Thread nedir, backend’te nerede karşımıza çıkar?
@@ -462,24 +748,132 @@ Uzun süren işler (rapor, PDF, mail):
 - Kullanıcıya hemen cevap döndürmek için:
   - İş arka planda farklı bir thread’e verilir (`@Async`, `ExecutorService`).
 
----
-
-### 2.3. Process vs Thread
-
-**Process**
-- Çalışan programın ayrı bir örneği.
-- Kendi adres alanı, heap, stack.
-- Diğer process’lerle bellek paylaşmaz (IPC gerek).
-
-**Thread**
-- Aynı process içindeki yürütme akışı.
-- Heap ve global veriyi diğer thread’lerle paylaşır.
-- Her thread’in kendi stack’i vardır.
-
-Backend’te:
-- Genelde: 1 JVM process + içinde birden fazla thread (request thread’leri, async thread’ler).
+Ek olarak:
+- Message queue tüketicileri (Kafka listener, RabbitMQ consumer),
+- `@Scheduled` job’lar,
+- Background batch işler
+hep ayrı thread havuzlarında çalışır.
 
 ---
+
+### 5. Spring Boot’ta gerçekçi bir örnek: `@Async` ile arka plan işi
+
+**Senaryo:**
+- Kullanıcı kayıt olurken,
+- Controller hemen “kayıt başarılı” cevabını dönsün,
+- Ama arkada “Hoş geldin” maili gönderilsin (mail geç sürebilir).
+
+Eğer maili aynı thread’de gönderirsen:
+- Kullanıcı 2–3 saniye response bekler.
+
+`@Async` ile:
+- Mail işini başka bir thread’e verirsin,
+- HTTP response hemen döner,
+- Mail arkada gönderilir.
+
+#### 5.1. Config: `@EnableAsync`
+
+```java
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+
+    @Bean(name = "emailTaskExecutor")
+    public Executor emailTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("email-");
+        executor.initialize();
+        return executor;
+    }
+}
+```
+
+#### 5.2. Servis: `@Async` ile mail gönderme
+
+```java
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+@Service
+public class EmailService {
+
+    @Async("emailTaskExecutor")
+    public void sendWelcomeEmail(String email) {
+        System.out.println("Hoş geldin maili hazırlanıyor: " + email
+                + " - Thread: " + Thread.currentThread().getName());
+        try {
+            Thread.sleep(2000); // 2 sn süren ağır iş gibi düşün
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("Hoş geldin maili gönderildi: " + email
+                + " - Thread: " + Thread.currentThread().getName());
+    }
+}
+```
+
+#### 5.3. Controller: Kullanıcı kayıt olurken asenkron mail çağrısı
+
+```java
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+public class RegistrationController {
+
+    private final EmailService emailService;
+
+    public RegistrationController(EmailService emailService) {
+        this.emailService = emailService;
+    }
+
+    @PostMapping("/register")
+    public String register(@RequestParam String email) {
+        // 1) Kullanıcıyı veritabanına kaydet (örnek):
+        // userRepository.save(new User(email));
+
+        // 2) Hoş geldin mailini asenkron gönder:
+        emailService.sendWelcomeEmail(email);
+
+        // 3) Kullanıcıya hemen cevap döndür:
+        return "Kaydın alındı, mail kısa süre içinde gönderilecek.";
+    }
+}
+```
+
+#### 5.4. Çalışma sırası
+
+1. `/api/register?email=test@test.com` endpoint’ine POST isteği geliyor.
+2. Controller, web server’ın bir request thread’i üzerinde çalışıyor (ör. `http-nio-8080-exec-1`).
+3. `emailService.sendWelcomeEmail(email)` çağrıldığında:
+   - Spring, bu metodu `@Async` olduğu için **kendi thread pool’una** bir iş olarak ekliyor,
+   - Örneğin `email-1` isimli başka bir thread bu işi almaya başlıyor.
+4. Request thread’i maili beklemeden, hemen HTTP cevabını döndürüyor.
+5. Arkada `email-1` thread’i 2 saniye çalışıp maili gönderiyor (veya log basıyor).
+
+Log’larda şuna benzer şeyler görürsün:
+
+```text
+Hoş geldin maili hazırlanıyor: test@test.com - Thread: email-1
+Hoş geldin maili gönderildi: test@test.com - Thread: email-1
+```
+
+Bu sayede:
+- Kullanıcı arayüzü hızlı cevap alır,
+- Uzun süren iş (mail gönderme) arkada, farklı bir thread pool’da yürür.
 
 ### 2.4. Request bitince thread ölür mü? (Thread pool)
 
@@ -492,40 +886,9 @@ Backend’te:
 
 > “Her istek için yeni thread yaratılıp sonra öldürülmez; var olan thread’ler havuzda tekrar tekrar kullanılır.”
 
----
-
-### 2.5. synchronized nasıl çalışır?
-
-- `synchronized`, aynı anda **tek thread**’in belirli bir blok/metodu çalıştırmasını sağlar.
-- Nesne üzerinde **monitor lock** alır.
-
-```java
-public class Counter {
-    private int count = 0;
-
-    public synchronized void increment() {
-        count++; // aynı anda tek thread girebilir
-    }
-
-    public int getCount() {
-        return count;
-    }
-}
-```
-
-Veya blok bazlı:
-
-```java
-public void increment() {
-    synchronized (this) {
-        count++;
-    }
-}
-
-public static synchronized void foo() {
-    // class-level lock
-}
-```
+Bu sayede:
+- Thread oluşturma/yıkma maliyeti düşer,
+- Maksimum eşzamanlı istek sayısını havuz boyutuyla kontrol edebilirsin.
 
 ---
 
@@ -561,33 +924,15 @@ Thread t2 = new Thread(() -> {
 });
 ```
 
+Bu durumda:
+- T1 `lock1`’i alıp `lock2`’yi beklerken,
+- T2 `lock2`’yi alıp `lock1`’i beklerse → deadlock.
+
 Önlemek için:
 1. Lock’ları **her zaman aynı sırayla** al (örn. her yerde önce `lock1`, sonra `lock2`).
 2. Gereksiz lock kullanma.
 3. Lock’lı bölgeyi minimum tut.
 4. `java.util.concurrent` yapılarını kullan (`ReentrantLock.tryLock()`, `Semaphore`, `ConcurrentHashMap` vb.).
-
----
-
-### 2.7. wait(), sleep(), notify() farkı
-
-**`sleep(long millis)`**
-- `Thread.sleep(...)` → thread’i belirtilen süre uyutur.
-- Lock bırakmaz.
-- Zamanlama için kullanılır.
-
-**`wait()`**
-- Her `Object`’te vardır.
-- Sadece `synchronized` blok içinde çağrılabilir.
-- Çağıran thread:
-  - Monitor lock’u bırakır,
-  - WAITING durumuna geçer,
-  - `notify()`/`notifyAll()` veya timeout ile uyanır.
-
-**`notify()` / `notifyAll()`**
-- Aynı lock üzerinde `wait()` eden thread’leri uyandırır.
-- `notify()` → bir thread,
-- `notifyAll()` → hepsi.
 
 ---
 
@@ -619,7 +964,7 @@ executor.shutdown();
 Avantajlar:
 - Thread oluşturma/yıkma maliyeti azalır.
 - Aynı anda kaç thread çalışacağını kontrol edebilirsin.
-- `Future` ile sonucu takip edebilirsin.
+- `Future` ile işi takip edip sonucunu alabilirsin.
 
 ---
 
@@ -661,3 +1006,71 @@ executor.shutdown();
 **Analojik:**
 - `Callable` → yapılacak işin tarifi  
 - `Future`   → o işin sonucu hazır olunca elinde tuttuğun fiş / makbuz
+
+---
+
+### 2.5. synchronized nasıl çalışır?
+
+- `synchronized`, aynı anda **tek thread**’in belirli bir blok/metodu çalıştırmasını sağlar.
+- Nesne üzerinde **monitor lock** alır.
+
+```java
+public class Counter {
+    private int count = 0;
+
+    public synchronized void increment() {
+        count++; // aynı anda tek thread girebilir
+    }
+
+    public int getCount() {
+        return count;
+    }
+}
+```
+
+Veya blok bazlı:
+
+```java
+public void increment() {
+    synchronized (this) {
+        count++;
+    }
+}
+
+public static synchronized void foo() {
+    // class-level lock
+}
+```
+
+Temel amaç:
+- Paylaşılan verinin aynı anda iki thread tarafından bozulmamasını sağlamak.
+
+---
+
+### 2.7. wait(), sleep(), notify() farkı
+
+**`sleep(long millis)`**
+- `Thread.sleep(...)` → thread’i belirtilen süre uyutur.
+- Lock bırakmaz.
+- Zamanlama için kullanılır.
+
+**`wait()`**
+- Her `Object`’te vardır.
+- Sadece `synchronized` blok içinde çağrılabilir.
+- Çağıran thread:
+  - Monitor lock’u bırakır,
+  - WAITING durumuna geçer,
+  - `notify()`/`notifyAll()` veya timeout ile uyanır.
+
+**`notify()` / `notifyAll()`**
+- Aynı lock üzerinde `wait()` eden thread’leri uyandırır.
+- `notify()` → bir thread,
+- `notifyAll()` → hepsi.
+
+Kısaca:
+- `sleep` → Thread class’ına ait, lock serbest bırakmaz.
+- `wait` / `notify` → Object’in monitor mekanizması, `synchronized` ile birlikte kullanılır.
+
+---
+
+
