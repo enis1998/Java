@@ -2,7 +2,7 @@
 
 Bu repo, özellikle banka mülakatları (örn. Yapı Kredi) için hazırladığım **Java Backend Developer** notlarını içeriyor.
 
-İçerik, sık sorulan konulara göre 7 ana başlığa ayrılmıştır:
+İçerik, sık sorulan konulara göre 3 ana başlığa ayrılmıştır:
 
 1. Core Java (Temeller + Threading / Concurrency)  
 2. Spring & Spring Boot
