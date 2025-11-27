@@ -1,6 +1,6 @@
 # Java Backend Mülakat Hazırlık Notları
 
-Bu repo, özellikle banka mülakatları (örn. Yapı Kredi) için hazırladığım **Java Backend Developer** notlarını içeriyor.
+Bu repo, hazırladığım **Java Backend Developer** notlarını içeriyor.
 
 İçerik, sık sorulan konulara göre 3 ana başlığa ayrılmıştır:
 
