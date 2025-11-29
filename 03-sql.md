@@ -1,6 +1,6 @@
 # 3) DATABASE SORULARI – Detaylı Açıklamalar
 
-Bu doküman, temel veritabanı (database) kavramlarını hiç bilmeyen birine anlatır gibi, **mantığıyla** ve **örneklerle** açıklamak için hazırlanmıştır.
+Bu doküman, temel veritabanı (database) kavramlarını **mantığıyla** ve **örneklerle** açıklamak için hazırlanmıştır.
 
 Kapsam:
 
